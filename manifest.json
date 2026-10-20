@@ -1,0 +1,62 @@
+{
+  "manifest_version": 3,
+  "name": "Better-PoEDB",
+  "version": "1.0.0",
+  "description": "在 poedb.tw 和 poe2db.tw 的繁体中文页面旁显示英文原文，方便复制技能、词缀和物品名称。",
+  "icons": {
+    "16": "icons/icon16.png",
+    "48": "icons/icon48.png",
+    "128": "icons/icon128.png"
+  },
+  "permissions": ["storage", "activeTab", "scripting"],
+  "host_permissions": [
+    "https://poedb.tw/*",
+    "https://poe2db.tw/*",
+    "https://cdn.poedb.tw/*",
+    "https://cdn.poe2db.tw/*"
+  ],
+  "background": {
+    "service_worker": "background.js"
+  },
+  "action": {
+    "default_popup": "popup.html",
+    "default_title": "Better-PoEDB",
+    "default_icon": {
+      "16": "icons/icon16.png",
+      "48": "icons/icon48.png",
+      "128": "icons/icon128.png"
+    }
+  },
+  "commands": {
+    "toggle-english": {
+      "suggested_key": {
+        "default": "Alt+Shift+E",
+        "mac": "Alt+Shift+E"
+      },
+      "description": "显示或隐藏繁体页面上的英文原文"
+    }
+  },
+  "content_scripts": [
+    {
+      "matches": [
+        "https://poedb.tw/tw/*",
+        "https://poedb.tw/tw",
+        "https://www.poedb.tw/tw/*",
+        "https://www.poedb.tw/tw",
+        "https://poe2db.tw/tw/*",
+        "https://poe2db.tw/tw",
+        "https://www.poe2db.tw/tw/*",
+        "https://www.poe2db.tw/tw"
+      ],
+      "css": ["content.css"],
+      "js": ["shared/sites.js", "shared/text.js", "shared/align.js", "shared/mods.js", "content.js"],
+      "run_at": "document_idle"
+    }
+  ],
+  "web_accessible_resources": [
+    {
+      "resources": ["page-bridge.js"],
+      "matches": ["https://poedb.tw/*", "https://poe2db.tw/*", "https://www.poedb.tw/*", "https://www.poe2db.tw/*"]
+    }
+  ]
+}

@@ -1,0 +1,28 @@
+<!DOCTYPE html>
+<html lang="zh-Hans">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Better-PoEDB</title>
+  <link rel="stylesheet" href="popup.css">
+</head>
+<body>
+  <div class="shell">
+    <header>
+      <div>
+        <h1>Better-PoEDB</h1>
+        <p>繁体页面旁显示英文原文</p>
+      </div>
+      <span class="mark">EN</span>
+    </header>
+    <section>
+      <label class="switch">
+        <span><strong>显示英文</strong><small>Alt+Shift+E，跟在中文下面</small></span>
+        <input id="enabled" type="checkbox">
+      </label>
+      <p id="status" class="status">正在检查当前页面…</p>
+    </section>
+  </div>
+  <script src="popup.js"></script>
+</body>
+</html>
