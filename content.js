@@ -156,6 +156,14 @@ if (message.type === 'bp-toggle') {
     }
   }
 
+  function isTradeModNode(el) {
+    if (!el || !el.closest || !el.classList) return false;
+    if (el.closest('.GemPopup, .bp-mod-english')) return false;
+    if (el.classList.contains('explicitMod') || el.classList.contains('implicitMod') || el.classList.contains('item_magic')) return true;
+    if ((el.classList.contains('card-header') || el.tagName === 'H5') && el.querySelector && el.querySelector('.item_magic, .explicitMod, .mod-value')) return true;
+    return false;
+  }
+
   function paint(pairs, root) {
     const scope = root && root.querySelectorAll ? root : document;
     const existing = scope.querySelectorAll('[data-bp-annotated]');
@@ -163,7 +171,8 @@ if (message.type === 'bp-toggle') {
     const keep = new Set();
     pairs.forEach((pair) => {
       if (!pair.node || !pair.node.isConnected) return;
-      upsert(pair.node, pair.enText);
+      const english = isTradeModNode(pair.node) && BP.patternLine ? BP.patternLine(pair.enText) : pair.enText;
+      upsert(pair.node, english);
       pair.node.setAttribute('data-bp-annotated', '1');
       keep.add(pair.node);
     });

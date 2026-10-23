@@ -25,3 +25,9 @@ test('compound mods keep each line copyable', () => {
     [['15', '19'], ['16', '20']]
   ]);
 });
+
+test('unique mod numbers become trade-site hashes', () => {
+  assert.equal(mods.patternLine('(300—400)% increased Physical Damage'), '#% increased Physical Damage');
+  assert.equal(mods.patternLine('Adds (10—20) to (30—40) Fire Damage'), 'Adds # to # Fire Damage');
+  assert.equal(mods.patternLine('Your Physical Damage can Shock'), 'Your Physical Damage can Shock');
+});
