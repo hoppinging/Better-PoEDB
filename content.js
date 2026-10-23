@@ -7,6 +7,8 @@
     englishUrl: '',
     modCatalog: null,
     pageTimer: 0,
+    modTimer: 0,
+    pendingMods: [],
     applying: false,
     ready: false
   };
@@ -43,7 +45,7 @@
       sendResponse(status());
       return;
     }
-if (message.type === 'bp-toggle') {
+    if (message.type === 'bp-toggle') {
       const enabled = !state.settings.enabled;
       state.settings.enabled = enabled;
       chrome.storage.local.set({ enabled: enabled });
@@ -110,37 +112,92 @@ if (message.type === 'bp-toggle') {
     });
   }
 
+  const IGNORE_TAGS = new Set(['script', 'style', 'noscript', 'template', 'svg', 'iframe', 'link', 'meta', 'canvas', 'img', 'picture', 'source', 'video', 'audio']);
+
   function observe() {
     if (state.observer || !document.body) return;
     state.observer = new MutationObserver((records) => {
       if (state.applying || !state.settings.enabled) return;
-      let structural = false;
+      const modRoots = [];
+      let page = false;
       records.forEach((record) => {
         Array.from(record.addedNodes).forEach((node) => {
-          if (!node || node.nodeType !== 1) return;
-          if (isOwn(node) || isTooltip(node)) return;
-          structural = true;
+          const action = addedAction(node);
+          if (action === 'page') page = true;
+          else if (action === 'mods') modRoots.push(node);
         });
       });
-      if (structural) schedulePage();
+      if (page) schedulePage();
+      else if (modRoots.length) scheduleMods(modRoots);
     });
     state.observer.observe(document.body, { childList: true, subtree: true });
   }
 
+  function addedAction(node) {
+    if (!node || node.nodeType !== 1) return 'ignore';
+    const tag = String(node.tagName || '').toLowerCase();
+    if (IGNORE_TAGS.has(tag)) return 'ignore';
+    if (isOwn(node) || isTooltip(node) || isAd(node)) return 'ignore';
+    if (node.closest && node.closest('script, style, noscript, iframe, svg, ins, .tippy-box, .tippy-content, .tooltip, .popover, .modal-backdrop, .offcanvas-backdrop, #topbanner970, .bp-enline, .bp-dock, .bp-mod-english, .bp-mod-summary')) return 'ignore';
+    if (isModRoot(node)) return 'mods';
+    return 'page';
+  }
+
+  function isAd(node) {
+    const id = String(node.id || '');
+    const cls = typeof node.className === 'string' ? node.className : '';
+    if (node.classList && (node.classList.contains('modal-backdrop') || node.classList.contains('offcanvas-backdrop'))) return true;
+    if (/adsbygoogle|google-auto-placed|advertisement/i.test(cls + ' ' + id)) return true;
+    if (/^(google_ads|aswift|ad-|topbanner)/i.test(id)) return true;
+    return String(node.tagName || '').toLowerCase() === 'ins';
+  }
+
+  function isModRoot(node) {
+    const id = node.id || '';
+    if (id === 'canvas' || id === 'ModifiersCalc') return true;
+    if (node.classList && (node.classList.contains('modal') || node.classList.contains('mod-title'))) return true;
+    return !!(node.closest && node.closest('#canvas, #ModifiersCalc, .modal'));
+  }
+
   function isTooltip(node) {
-    if (node.classList && (node.classList.contains('tippy-box') || node.classList.contains('tippy-content'))) return true;
-    return !!(node.closest && node.closest('.tippy-box, .tippy-content'));
+    if (node.classList && (node.classList.contains('tippy-box') || node.classList.contains('tippy-content') || node.classList.contains('tooltip') || node.classList.contains('popover'))) return true;
+    if (node.getAttribute && node.getAttribute('role') === 'tooltip') return true;
+    return !!(node.closest && node.closest('.tippy-box, .tippy-content, .tooltip, .popover, [role="tooltip"]'));
   }
 
   function isOwn(node) {
     if (!node.classList) return false;
-    if (node.classList.contains('bp-enline') || node.classList.contains('bp-dock')) return true;
-    return !!(node.closest && node.closest('.bp-enline, .bp-dock'));
+    if (node.classList.contains('bp-enline') || node.classList.contains('bp-dock') || node.classList.contains('bp-mod-english') || node.classList.contains('bp-mod-summary') || node.classList.contains('bp-entext') || node.classList.contains('bp-copy')) return true;
+    return !!(node.closest && node.closest('.bp-enline, .bp-dock, .bp-mod-english, .bp-mod-summary'));
   }
 
   function schedulePage() {
     clearTimeout(state.pageTimer);
+    clearTimeout(state.modTimer);
+    state.pendingMods = [];
     state.pageTimer = setTimeout(applyPage, 180);
+  }
+
+  function scheduleMods(nodes) {
+    nodes.forEach((node) => {
+      if (state.pendingMods.indexOf(node) === -1) state.pendingMods.push(node);
+    });
+    clearTimeout(state.modTimer);
+    state.modTimer = setTimeout(flushMods, 180);
+  }
+
+  function flushMods() {
+    const nodes = state.pendingMods.splice(0);
+    if (!state.settings.enabled || !state.modCatalog || !nodes.length) return;
+    state.applying = true;
+    try {
+      nodes.forEach((node) => {
+        if (node && node.isConnected !== false) annotateMods(node);
+      });
+      renderDock();
+    } finally {
+      state.applying = false;
+    }
   }
 
   function applyPage() {
@@ -156,14 +213,6 @@ if (message.type === 'bp-toggle') {
     }
   }
 
-  function isTradeModNode(el) {
-    if (!el || !el.closest || !el.classList) return false;
-    if (el.closest('.GemPopup, .bp-mod-english')) return false;
-    if (el.classList.contains('explicitMod') || el.classList.contains('implicitMod') || el.classList.contains('item_magic')) return true;
-    if ((el.classList.contains('card-header') || el.tagName === 'H5') && el.querySelector && el.querySelector('.item_magic, .explicitMod, .mod-value')) return true;
-    return false;
-  }
-
   function paint(pairs, root) {
     const scope = root && root.querySelectorAll ? root : document;
     const existing = scope.querySelectorAll('[data-bp-annotated]');
@@ -171,7 +220,7 @@ if (message.type === 'bp-toggle') {
     const keep = new Set();
     pairs.forEach((pair) => {
       if (!pair.node || !pair.node.isConnected) return;
-      const english = isTradeModNode(pair.node) && BP.patternLine ? BP.patternLine(pair.enText) : pair.enText;
+      const english = BP.shouldHashTradeNode(pair.node) && BP.patternLine ? BP.patternLine(pair.enText) : pair.enText;
       upsert(pair.node, english);
       pair.node.setAttribute('data-bp-annotated', '1');
       keep.add(pair.node);
@@ -266,11 +315,11 @@ if (message.type === 'bp-toggle') {
   function annotateMods(root) {
     if (!state.modCatalog || !state.modCatalog.size) return;
     const scope = root && root.querySelectorAll ? root : document;
-    scope.querySelectorAll('.mod-title[data-gengroup]').forEach((el) => {
+    modTitles(scope).forEach((el) => {
       const block = el.closest ? el.closest('.identifyBlock') : null;
       const category = BP.identifyCategory(block ? block.className : '');
       const group = el.getAttribute('data-gengroup') || '';
-            const pattern = BP.lookupModEnglish(category, group, state.modCatalog);
+      const pattern = BP.lookupModEnglish(category, group, state.modCatalog);
       const tiers = BP.lookupModTiers(category, group, state.modCatalog);
       if (pattern) {
         placeModNote(el, modLines(pattern.split('\n')), 'after');
@@ -287,6 +336,36 @@ if (message.type === 'bp-toggle') {
         placeModNote(host, modValueLines(lines), 'inside');
       });
     });
+  }
+
+  function modTitles(scope) {
+    const found = [];
+    const seen = new Set();
+    function add(el) {
+      if (!el || seen.has(el)) return;
+      seen.add(el);
+      found.push(el);
+    }
+    if (scope.matches && scope.matches('.mod-title[data-gengroup]')) add(scope);
+    scope.querySelectorAll('.mod-title[data-gengroup]').forEach(add);
+    const modals = [];
+    if (scope.classList && scope.classList.contains('modal')) modals.push(scope);
+    else if (scope.closest) {
+      const host = scope.closest('.modal');
+      if (host) modals.push(host);
+    }
+    if (scope.querySelectorAll && scope !== document && scope !== document.body) {
+      scope.querySelectorAll('.modal').forEach((el) => modals.push(el));
+    }
+    modals.forEach((modal) => add(titleForModal(modal)));
+    return found;
+  }
+
+  function titleForModal(modal) {
+    if (!modal || !modal.id || !document.querySelector) return null;
+    const id = window.CSS && CSS.escape ? CSS.escape(modal.id) : String(modal.id).replace(/[^A-Za-z0-9_-]/g, '');
+    if (!id) return null;
+    return document.querySelector('.mod-title[data-gengroup][data-bs-target="#' + id + '"]');
   }
 
   function clearAnnotations() {
@@ -322,9 +401,7 @@ if (message.type === 'bp-toggle') {
   }
 
   function copyTextFor(button) {
-    let node = button.previousElementSibling;
-    while (node && !(node.classList && node.classList.contains('bp-entext'))) node = node.previousElementSibling;
-    return node ? node.textContent : '';
+    return BP.adjacentCopyText ? BP.adjacentCopyText(button) : '';
   }
 
   function bindUi() {
@@ -393,9 +470,6 @@ if (message.type === 'bp-toggle') {
 
   function fetchText(url) {
     if (!BP.isAllowedFetchUrl(url)) return Promise.reject(new Error('blocked'));
-    let host = '';
-    try { host = new URL(url).hostname; } catch (error) { return Promise.reject(error); }
-    if (host.indexOf('cdn.') === 0) return fetchFromPage(url);
     return fetch(url, { credentials: 'omit', cache: 'default' }).then((response) => {
       if (!response.ok) throw new Error(String(response.status));
       return response.text();

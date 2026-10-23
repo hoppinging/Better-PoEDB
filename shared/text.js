@@ -46,6 +46,19 @@
     return numbers.map((value) => value.replace(/,/g, '')).join(',');
   }
 
+  function adjacentCopyText(button) {
+    let node = button && button.previousElementSibling;
+    while (node) {
+      const classes = node.classList;
+      const named = typeof node.className === 'string' ? node.className.split(/\s+/) : [];
+      if ((classes && classes.contains && classes.contains('bp-entext')) || named.indexOf('bp-entext') !== -1) {
+        return String(node.textContent || '');
+      }
+      node = node.previousElementSibling;
+    }
+    return '';
+  }
+
   function shouldAnnotate(zh, en) {
     const source = normalizeBlock(zh);
     const target = normalizeBlock(en);
@@ -57,7 +70,7 @@
     return true;
   }
 
-  const api = { hasHan, hasLatin, hanCount, latinCount, normalizeBlock, foldPunct, skeleton, shouldAnnotate };
+  const api = { hasHan, hasLatin, hanCount, latinCount, normalizeBlock, foldPunct, skeleton, shouldAnnotate, adjacentCopyText };
   globalThis.__BP = Object.assign(globalThis.__BP || {}, api);
   if (typeof module !== 'undefined' && module.exports) module.exports = api;
 })();

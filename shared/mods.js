@@ -18,36 +18,6 @@
       .trim();
   }
 
-  function slotsOf(line) {
-    const found = [];
-    const pattern = /(\d+(?:\.\d+)?)(?:\s*[—–\-−]\s*(\d+(?:\.\d+)?))?/g;
-    let match;
-    while ((match = pattern.exec(String(line || '')))) {
-      const low = Number(match[1]);
-      const high = match[2] == null ? low : Number(match[2]);
-      found.push({ low: low, high: high });
-    }
-    return found;
-  }
-
-  function mean(values) {
-    const total = values.reduce((sum, value) => sum + value, 0);
-    const average = total / values.length;
-    if (values.every((value) => Number.isInteger(value))) return String(Math.round(average));
-    return String(Math.round(average * 10) / 10);
-  }
-
-  function applyAverages(template, stats) {
-    let index = 0;
-    return String(template).replace(/(\d+(?:\.\d+)?)(\s*[—–\-−]\s*)(\d+(?:\.\d+)?)|(\d+(?:\.\d+)?)/g, (full, low, separator, high) => {
-      const stat = stats[index];
-      index += 1;
-      if (!stat) return full;
-      if (high != null) return stat.low === stat.high ? stat.low : stat.low + separator + stat.high;
-      return stat.low;
-    });
-  }
-
   function formatNumber(value) {
     if (Number.isInteger(value)) return String(value);
     return String(Math.round(value * 10) / 10);
@@ -174,6 +144,159 @@
     return entry && entry.tiers ? entry.tiers.map((lines) => lines.slice()) : [];
   }
 
+  const TRADE_POPUPS = new Set(['uniquepopup', 'normalpopup', 'magicpopup', 'rarepopup', 'newitempopup']);
+  const ITEM_LINK_CLASSES = new Set(['uniqueitem', 'uniqueitems', 'whiteitem', 'rareitem', 'magicitem', 'item_unique']);
+
+  function classTokens(el) {
+    if (!el || el.nodeType !== 1) return [];
+    if (typeof el.className === 'string') return el.className.split(/\s+/).filter(Boolean);
+    if (el.classList) {
+      const list = [];
+      for (let i = 0; i < el.classList.length; i += 1) list.push(el.classList[i]);
+      return list;
+    }
+    return [];
+  }
+
+  function hasClass(el, name) {
+    return classTokens(el).indexOf(name) !== -1;
+  }
+
+  function hasClassFold(el, name) {
+    const target = String(name || '').toLowerCase();
+    return classTokens(el).some((token) => token.toLowerCase() === target);
+  }
+
+  function tagOf(el) {
+    return el && el.tagName ? String(el.tagName).toLowerCase() : '';
+  }
+
+  function parentEl(el) {
+    const parent = el && (el.parentElement || (el.parentNode && el.parentNode.nodeType === 1 ? el.parentNode : null));
+    return parent && parent.nodeType === 1 ? parent : null;
+  }
+
+  function elementKids(el) {
+    if (!el) return [];
+    if (el.children) return Array.from(el.children);
+    return (el.childNodes || []).filter((node) => node && node.nodeType === 1);
+  }
+
+  function walkElements(el, visit) {
+    if (!el || el.nodeType !== 1) return;
+    visit(el);
+    elementKids(el).forEach((kid) => walkElements(kid, visit));
+  }
+
+  function isInside(node, ancestor) {
+    let current = node;
+    while (current) {
+      if (current === ancestor) return true;
+      current = parentEl(current);
+    }
+    return false;
+  }
+
+  function excludedTradeHost(el) {
+    let node = el;
+    while (node) {
+      if (hasClassFold(node, 'GemPopup') || hasClassFold(node, 'identifyBlock') || hasClass(node, 'bp-mod-english') || hasClass(node, 'bp-enline') || hasClass(node, 'bp-dock')) return true;
+      node = parentEl(node);
+    }
+    return false;
+  }
+
+  function insideTable(el) {
+    let node = parentEl(el);
+    while (node) {
+      if (tagOf(node) === 'table') return true;
+      node = parentEl(node);
+    }
+    return false;
+  }
+
+  function insideModifiersCalc(el) {
+    let node = el;
+    while (node) {
+      if (node.id === 'ModifiersCalc') return true;
+      node = parentEl(node);
+    }
+    return false;
+  }
+
+  function insideModal(el) {
+    let node = el;
+    while (node) {
+      if (hasClass(node, 'modal')) return true;
+      node = parentEl(node);
+    }
+    return false;
+  }
+
+  function isModText(el) {
+    return hasClass(el, 'explicitMod') || hasClass(el, 'implicitMod') || hasClass(el, 'item_magic');
+  }
+
+  function isCardTitle(el) {
+    if (hasClass(el, 'mod-title')) return true;
+    const tag = tagOf(el);
+    if (!hasClass(el, 'card-header') && tag !== 'h5') return false;
+    let found = false;
+    walkElements(el, (node) => {
+      if (node !== el && (isModText(node) || hasClass(node, 'mod-value'))) found = true;
+    });
+    return found;
+  }
+
+  function isItemAnchor(el) {
+    if (tagOf(el) !== 'a') return false;
+    if (hasClassFold(el, 'KeywordPopups') || hasClassFold(el, 'GemTags')) return false;
+    return classTokens(el).some((name) => ITEM_LINK_CLASSES.has(name.toLowerCase()));
+  }
+
+  function entryHasItemLink(el) {
+    let node = parentEl(el);
+    let entry = null;
+    while (node) {
+      if (tagOf(node) === 'body' || tagOf(node) === 'table' || node.id === 'ModifiersCalc' || hasClass(node, 'modal')) break;
+      if (tagOf(node) === 'tr' || tagOf(node) === 'li' || hasClass(node, 'col') || hasClass(node, 'd-flex') || hasClass(node, 'card')) {
+        entry = node;
+        if (tagOf(node) === 'tr' || tagOf(node) === 'li' || hasClass(node, 'col')) break;
+      }
+      node = parentEl(node);
+    }
+    if (!entry) return false;
+    let hit = false;
+    walkElements(entry, (node) => {
+      if (hit || node === el || isInside(node, el)) return;
+      if (isItemAnchor(node)) hit = true;
+    });
+    return hit;
+  }
+
+  function insideTradePopup(el) {
+    let node = parentEl(el);
+    while (node) {
+      if (classTokens(node).some((name) => TRADE_POPUPS.has(name.toLowerCase()))) return true;
+      node = parentEl(node);
+    }
+    return false;
+  }
+
+  function shouldHashTradeNode(el) {
+    if (!el || el.nodeType !== 1) return false;
+    if (excludedTradeHost(el)) return false;
+    const modText = isModText(el);
+    const cardTitle = isCardTitle(el);
+    if (!modText && !cardTitle) return false;
+    if (insideTable(el) || insideModal(el) || insideModifiersCalc(el)) {
+      return hasClass(el, 'mod-title') && !insideTable(el) && !insideModal(el);
+    }
+    if (insideTradePopup(el)) return modText || cardTitle;
+    if (cardTitle) return true;
+    return modText && entryHasItemLink(el);
+  }
+
   const api = {
     splitLines: splitLines,
     patternLine: patternLine,
@@ -181,7 +304,8 @@
     modCatalog: modCatalog,
     identifyCategory: identifyCategory,
     lookupModEnglish: lookupModEnglish,
-    lookupModTiers: lookupModTiers
+    lookupModTiers: lookupModTiers,
+    shouldHashTradeNode: shouldHashTradeNode
   };
   globalThis.__BP = Object.assign(globalThis.__BP || {}, api);
   if (typeof module !== 'undefined' && module.exports) module.exports = api;

@@ -22,15 +22,12 @@ test('item links use the same key in both languages', () => {
   assert.equal(sites.hrefKey('#top'), '');
 });
 
-test('query hovers are rewritten to the english hover endpoint', () => {
-  assert.equal(
-    sites.resolveHoverUrl('?s=Data%5CWorldAreas%2F1_1_town', 'https://poedb.tw/tw/Fireball'),
-    'https://poedb.tw/us/hover?s=Data%5CWorldAreas%2F1_1_town'
-  );
-  assert.equal(
-    sites.resolveHoverUrl('/cache1/us/File/abc', 'https://poe2db.tw/tw/Fireball'),
-    'https://cdn.poe2db.tw/cache1/us/File/abc'
-  );
-  assert.equal(sites.isAllowedFetchUrl('https://cdn.poedb.tw/cache1/us/File/abc'), true);
+test('page fetches stay on the project hosts', () => {
+  assert.equal(sites.isAllowedFetchUrl('https://poedb.tw/us/Fireball'), true);
+  assert.equal(sites.isAllowedFetchUrl('https://www.poe2db.tw/us/Fireball'), true);
+  assert.equal(sites.isAllowedFetchUrl('http://poedb.tw/us/Fireball'), true);
+  assert.equal(sites.isAllowedFetchUrl('https://cdn.poedb.tw/cache1/us/File/abc'), false);
+  assert.equal(sites.isAllowedFetchUrl('https://cdn.poe2db.tw/cache1/us/File/abc'), false);
   assert.equal(sites.isAllowedFetchUrl('https://example.com/us/Fireball'), false);
+  assert.equal(sites.resolveHoverUrl, undefined);
 });

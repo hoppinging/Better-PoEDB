@@ -97,21 +97,6 @@ test('a keyword list keeps each term with its own english', () => {
   ]);
 });
 
-test('hover anchors are paired by item link', () => {
-  const zh = el('div', {}, [
-    el('a', { href: '/tw/Hillock', 'data-hover': 'https://cdn.poedb.tw/cache1/tw/Monster/aaa' }, [text('西拉克')])
-  ]);
-  const en = el('div', {}, [
-    el('a', { href: '/us/Hillock', 'data-hover': 'https://cdn.poedb.tw/cache1/us/Monster/bbb' }, [text('Hillock')])
-  ]);
-  const paired = align.pairHovers(
-    align.collectHovers(zh, 'https://poedb.tw/tw/Fireball'),
-    align.collectHovers(en, 'https://poedb.tw/us/Fireball')
-  );
-  assert.equal(paired.byHref.get('Hillock'), 'https://cdn.poedb.tw/cache1/us/Monster/bbb');
-  assert.equal(paired.byRaw.get('https://cdn.poedb.tw/cache1/tw/Monster/aaa'), 'https://cdn.poedb.tw/cache1/us/Monster/bbb');
-});
-
 test('html and body wrappers still reach the article', () => {
   const zh = el('html', {}, [
     el('head', {}, [el('title', {}, [text('火球')])]),

@@ -8,6 +8,28 @@ test('numbers and punctuation line up across languages', () => {
   assert.equal(text.skeleton('等級: (1—20)'), text.skeleton('Level: (1-20)'));
 });
 
+test('a copy button reads the english immediately before it', () => {
+  function piece(className, value) {
+    return {
+      className: className,
+      classList: { contains(name) { return className.split(/\s+/).indexOf(name) !== -1; } },
+      textContent: value,
+      previousElementSibling: null
+    };
+  }
+  const first = piece('bp-entext', '24.5');
+  const firstButton = piece('bp-copy', '复制');
+  const second = piece('bp-entext', '34.5');
+  const secondButton = piece('bp-copy', '复制');
+  [first, firstButton, second, secondButton].reduce((previous, item) => {
+    item.previousElementSibling = previous;
+    return item;
+  }, null);
+  assert.equal(text.adjacentCopyText(firstButton), '24.5');
+  assert.equal(text.adjacentCopyText(secondButton), '34.5');
+  assert.equal(text.adjacentCopyText(first), '');
+});
+
 test('chinese lines are annotated only when the english line is actually english', () => {
   assert.equal(text.shouldAnnotate('火球', 'Fireball'), true);
   assert.equal(text.shouldAnnotate('火球', '火球'), false);

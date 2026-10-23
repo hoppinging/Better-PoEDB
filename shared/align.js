@@ -215,53 +215,13 @@
     return alignRoots(zhRoot, enRoot).filter((pair) => !lib.shouldAnnotate || lib.shouldAnnotate(pair.zhText, pair.enText));
   }
 
-  function collectHovers(root, pageHref) {
-    const list = [];
-    walk(root);
-    return list;
-
-    function walk(node) {
-      if (!isElement(node) || chromeSelf(node)) return;
-      const tag = tagName(node);
-      if (SKIP_TAGS.has(tag)) return;
-      if (tag === 'a' && attr(node, 'data-hover')) {
-        const href = bp().hrefKey ? bp().hrefKey(attr(node, 'href')) : '';
-        const hover = bp().resolveHoverUrl ? bp().resolveHoverUrl(attr(node, 'data-hover'), pageHref) : attr(node, 'data-hover');
-        list.push({ hrefKey: href, hover: hover, raw: attr(node, 'data-hover') });
-      }
-      elementChildren(node).forEach(walk);
-    }
-  }
-
-  function pairHovers(zhList, enList) {
-    const buckets = new Map();
-    enList.forEach((item) => {
-      if (!item.hrefKey) return;
-      if (!buckets.has(item.hrefKey)) buckets.set(item.hrefKey, []);
-      buckets.get(item.hrefKey).push(item);
-    });
-    const byHref = new Map();
-    const byRaw = new Map();
-    zhList.forEach((item) => {
-      const bucket = item.hrefKey ? buckets.get(item.hrefKey) : null;
-      const match = bucket && bucket.length ? bucket.shift() : null;
-      if (!match || !match.hover) return;
-      if (item.hrefKey && !byHref.has(item.hrefKey)) byHref.set(item.hrefKey, match.hover);
-      if (item.raw && !byRaw.has(item.raw)) byRaw.set(item.raw, match.hover);
-      if (item.hover && !byRaw.has(item.hover)) byRaw.set(item.hover, match.hover);
-    });
-    return { byHref: byHref, byRaw: byRaw };
-  }
-
   const api = {
     visibleText: visibleText,
     isLineUnit: isLineUnit,
     childKey: childKey,
     lcsPairs: lcsPairs,
     alignRoots: alignRoots,
-    annotationPairs: annotationPairs,
-    collectHovers: collectHovers,
-    pairHovers: pairHovers
+    annotationPairs: annotationPairs
   };
   globalThis.__BP = Object.assign(globalThis.__BP || {}, api);
   if (typeof module !== 'undefined' && module.exports) module.exports = api;

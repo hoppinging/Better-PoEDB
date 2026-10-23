@@ -11,9 +11,7 @@
   "permissions": ["storage", "activeTab", "scripting"],
   "host_permissions": [
     "https://poedb.tw/*",
-    "https://poe2db.tw/*",
-    "https://cdn.poedb.tw/*",
-    "https://cdn.poe2db.tw/*"
+    "https://poe2db.tw/*"
   ],
   "background": {
     "service_worker": "background.js"

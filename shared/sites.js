@@ -51,29 +51,10 @@
   function isAllowedFetchUrl(href) {
     const url = parseUrl(href);
     if (!url || (url.protocol !== 'https:' && url.protocol !== 'http:')) return false;
-    const host = url.hostname.toLowerCase();
-    return host === 'poedb.tw' || host === 'www.poedb.tw' || host === 'poe2db.tw' || host === 'www.poe2db.tw' || host === 'cdn.poedb.tw' || host === 'cdn.poe2db.tw';
+    return isProjectHost(url.hostname);
   }
 
-  function resolveHoverUrl(raw, pageHref) {
-    const value = String(raw || '').trim();
-    if (!value) return '';
-    const page = parseUrl(pageHref || 'https://poedb.tw/tw/');
-    if (!page) return '';
-    if (value.charAt(0) === '?') return page.origin + '/us/hover' + value;
-    if (value.startsWith('/cache1/') || value.startsWith('/cache2/')) {
-      const cdn = page.hostname.toLowerCase().indexOf('poe2db') !== -1 ? 'https://cdn.poe2db.tw' : 'https://cdn.poedb.tw';
-      return cdn + value;
-    }
-    if (/^https?:/i.test(value)) return value;
-    try {
-      return new URL(value, page.origin + '/us/').href;
-    } catch (error) {
-      return '';
-    }
-  }
-
-  const api = { englishPageUrl, hrefKey, isAllowedFetchUrl, isProjectHost, resolveHoverUrl };
+  const api = { englishPageUrl, hrefKey, isAllowedFetchUrl, isProjectHost };
   globalThis.__BP = Object.assign(globalThis.__BP || {}, api);
   if (typeof module !== 'undefined' && module.exports) module.exports = api;
 })();

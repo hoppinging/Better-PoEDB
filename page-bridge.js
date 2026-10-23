@@ -5,9 +5,7 @@
     'poedb.tw': true,
     'www.poedb.tw': true,
     'poe2db.tw': true,
-    'www.poe2db.tw': true,
-    'cdn.poedb.tw': true,
-    'cdn.poe2db.tw': true
+    'www.poe2db.tw': true
   };
 
   window.addEventListener('message', (event) => {
